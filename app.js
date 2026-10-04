@@ -322,18 +322,43 @@ window.addEventListener('blur', () => {
   for (let n = 1; n <= 8; n++) switchUp(n);
 });
 
-// ---- Web MIDI: a MIDI input of the computer instead of Bluetooth MIDI ----
+// ---- MIDI: a MIDI input of the computer (Web MIDI) or a Bluetooth MIDI controller (Web Bluetooth) ----
+// Browsers on the iPhone have no Web MIDI: there a Bluetooth MIDI controller (MC6 / MC8 Pro, WIDI) is connected
+// directly, as the board does it ("Bluetooth MIDI device ..." in the MIDI list).
 
-const MIDI_KEY = 'nano-controller:midi';   // the chosen input (full name)
-const midi = { access: null, input: null, wanted: '', list: [] };
+const MIDI_KEY = 'nano-controller:midi';   // the chosen input: its full name, or "ble:" + Bluetooth device name
+const BLE_PREFIX = 'ble:';
+const BLE_MIDI_SERVICE = '03b80e5a-ede8-4b33-a751-6ce34ec4c700';
+const BLE_MIDI_CHAR = '7772e5db-3868-4112-a1a9-f2669d106bf3';
+const midi = { access: null, input: null, wanted: '', list: [], ble: { device: null, ready: false, retry: null } };
 const midiLine = document.getElementById('midi-line');
+
+function midiWantsBle() {
+  return midi.wanted.startsWith(BLE_PREFIX);
+}
+
+function midiLabel(key) {
+  return key.startsWith(BLE_PREFIX) ? 'Bluetooth: ' + key.slice(BLE_PREFIX.length) : key;
+}
+
+function midiConnected() {
+  return midiWantsBle() ? midi.ble.ready : !!midi.input;
+}
 
 function midiShow(message) {
   midiLine.hidden = !midi.wanted;
   if (!midi.wanted) return;
-  const name = '<b>' + (midi.input ? midi.input.name : midi.wanted).replace(/[<&]/g, '') + '</b>';
-  midiLine.innerHTML = 'MIDI: ' + name + (midi.input ? '' : ' (not found - connected to this computer?)') +
-    (message ? ' - received <span class="hit">' + message + '</span>' : midi.input ? ' - waiting for messages' : '');
+  const name = '<b>' + midiLabel(midi.wanted).replace(/[<&]/g, '') + '</b>';
+  const missing = midiWantsBle() ? ' (not connected - tap it in the MIDI list)' : ' (not found - connected to this computer?)';
+  midiLine.innerHTML = 'MIDI: ' + name + (midiConnected() ? '' : missing) +
+    (message ? ' - received <span class="hit">' + message + '</span>' : midiConnected() ? ' - waiting for messages' : '');
+}
+
+function midiProblem(text) {
+  console.warn(text);
+  midiLine.hidden = false;
+  midiLine.textContent = text;
+  showToast(text, 'error');
 }
 
 function midiDescribe(d) {
@@ -343,9 +368,28 @@ function midiDescribe(d) {
   return Array.from(d).map((b) => b.toString(16).padStart(2, '0')).join(' ');
 }
 
+function midiMessage(status, d1, d2) {
+  midiShow(midiDescribe([status, d1, d2]));
+  M._web_midi_message(status, d1, d2);
+}
+
+// The screen's MIDI dialog: shown name, connected or not.
+function midiReport() {
+  M.ccall('web_midi_stored', null, ['string'], [midiLabel(midi.wanted)]);
+  midiShow();
+  M._web_midi_changed(midiConnected() ? 1 : 0);
+}
+
+function midiStore(key) {
+  try {
+    if (key) localStorage.setItem(MIDI_KEY, key);
+    else localStorage.removeItem(MIDI_KEY);
+  } catch (e) {}
+}
+
 async function midiAccess() {
   if (midi.access) return midi.access;
-  if (!navigator.requestMIDIAccess) return null;
+  if (!navigator.requestMIDIAccess) return null;   // e.g. on the iPhone
   try {
     midi.access = await navigator.requestMIDIAccess();
   } catch (e) {
@@ -356,17 +400,21 @@ async function midiAccess() {
   return midi.access;
 }
 
+// The list of the MIDI dialog: the computer's MIDI inputs, then Bluetooth MIDI (where Web Bluetooth exists).
 function midiList() {
   M._web_midi_inputs_clear();
-  midi.list = [];   // in the order the screen shows them
+  midi.list = [];
   if (midi.access) {
     for (const input of midi.access.inputs.values()) {
-      if (input.state !== 'connected') continue;
-      midi.list.push(input);
-      M.ccall('web_midi_input', null, ['string'], [input.name || 'MIDI input']);
+      if (input.state === 'connected' && midi.list.length < 7) midi.list.push({ input, label: input.name || 'MIDI input' });
     }
   }
-  M._web_midi_changed(midi.input ? 1 : 0);
+  if (navigator.bluetooth) {
+    const device = midi.ble.device;
+    midi.list.push({ ble: true, label: device ? 'Bluetooth: ' + (device.name || 'MIDI') : 'Bluetooth MIDI device ...' });
+  }
+  for (const entry of midi.list) M.ccall('web_midi_input', null, ['string'], [entry.label]);
+  midiReport();
 }
 
 async function midiSearch(on) {
@@ -375,22 +423,21 @@ async function midiSearch(on) {
   midiList();
 }
 
-function midiStore(name) {
-  try {
-    if (name) localStorage.setItem(MIDI_KEY, name);
-    else localStorage.removeItem(MIDI_KEY);
-  } catch (e) {}
-}
-
 function midiConnect(index) {
-  const input = midi.list[index];
-  if (!input) return;
-  midi.wanted = input.name || '';
+  const entry = midi.list[index];
+  if (!entry) return;
+  if (entry.ble) {
+    bleMidiChoose();
+    return;
+  }
+  bleMidiClose();
+  midi.wanted = entry.input.name || '';
   midiStore(midi.wanted);
   midiAttach();
 }
 
 function midiForget() {
+  bleMidiClose();
   midi.wanted = '';
   midiStore('');
   midiAttach();
@@ -398,15 +445,23 @@ function midiForget() {
 
 async function midiResume() {
   try { midi.wanted = localStorage.getItem(MIDI_KEY) || ''; } catch (e) { midi.wanted = ''; }
+  if (midiWantsBle()) {
+    // Connect the stored Bluetooth device again without the chooser, where the browser allows it.
+    if (!midi.ble.device && navigator.bluetooth && navigator.bluetooth.getDevices) {
+      try {
+        const name = midi.wanted.slice(BLE_PREFIX.length);
+        const device = (await navigator.bluetooth.getDevices()).find((d) => (d.name || 'MIDI') === name);
+        if (device) {
+          bleMidiUse(device);
+          return;
+        }
+      } catch (e) {}
+    }
+    midiReport();   // otherwise it is tapped once in the MIDI list
+    return;
+  }
   if (midi.wanted) await midiAccess();
   midiAttach();
-}
-
-function onMidi(e) {
-  const d = e.data;
-  if (!d.length || d[0] >= 0xF0) return;   // clock and other system messages
-  midiShow(midiDescribe(d));
-  if (d[0] >= 0x80) M._web_midi_message(d[0], d[1] || 0, d[2] || 0);
 }
 
 // Names stored by the first version of this page were shortened to 31 characters.
@@ -414,9 +469,15 @@ function midiMatches(input) {
   return input.name === midi.wanted || (midi.wanted.length >= 31 && (input.name || '').startsWith(midi.wanted));
 }
 
+function onMidi(e) {
+  const d = e.data;
+  if (d.length && d[0] >= 0x80 && d[0] < 0xF0) midiMessage(d[0], d[1] || 0, d[2] || 0);   // no clock or SysEx
+}
+
+// The chosen input of the computer (Web MIDI).
 function midiAttach() {
   let found = null;
-  if (midi.access && midi.wanted) {
+  if (midi.access && midi.wanted && !midiWantsBle()) {
     for (const input of midi.access.inputs.values()) {
       if (midiMatches(input) && input.state === 'connected') found = input;
     }
@@ -426,6 +487,107 @@ function midiAttach() {
     midi.input = found;
     if (found) found.onmidimessage = onMidi;
   }
-  midiShow();
-  M._web_midi_changed(found ? 1 : 0);
+  midiReport();
+}
+
+// ---- Bluetooth MIDI over Web Bluetooth ----
+
+async function bleMidiChoose() {
+  let device;
+  try {
+    device = await navigator.bluetooth.requestDevice({ filters: [{ services: [BLE_MIDI_SERVICE] }] });
+  } catch (e) {
+    if (!(e.name === 'NotFoundError' && /cancel/i.test(e.message))) midiProblem('Bluetooth MIDI: ' + e.message);
+    return;
+  }
+  bleMidiClose();
+  if (midi.input) {
+    midi.input.onmidimessage = null;
+    midi.input = null;
+  }
+  midi.wanted = BLE_PREFIX + (device.name || 'MIDI');
+  midiStore(midi.wanted);
+  bleMidiUse(device);
+}
+
+function bleMidiUse(device) {
+  midi.ble.device = device;
+  device.addEventListener('gattserverdisconnected', bleMidiLost);
+  bleMidiOpen();
+}
+
+async function bleMidiOpen() {
+  const device = midi.ble.device;
+  if (!device) return;
+  try {
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(BLE_MIDI_SERVICE);
+    const ch = await service.getCharacteristic(BLE_MIDI_CHAR);
+    ch.addEventListener('characteristicvaluechanged', onBleMidi);   // the same listener is added only once
+    await ch.startNotifications();
+    if (device !== midi.ble.device) return;   // forgotten meanwhile
+    midi.ble.ready = true;
+    showToast('MIDI: ' + (device.name || 'Bluetooth') + ' connected', 'ok');
+  } catch (e) {
+    console.warn('Bluetooth MIDI not connected', e);
+    if (device === midi.ble.device) bleMidiRetry();
+  }
+  midiList();
+}
+
+function bleMidiLost() {
+  midi.ble.ready = false;
+  midiReport();
+  if (midiWantsBle() && midi.ble.device) bleMidiRetry();
+}
+
+function bleMidiRetry() {
+  clearTimeout(midi.ble.retry);
+  midi.ble.retry = setTimeout(() => {
+    if (midiWantsBle() && midi.ble.device && !midi.ble.ready) bleMidiOpen();
+  }, 3000);
+}
+
+function bleMidiClose() {
+  const device = midi.ble.device;
+  clearTimeout(midi.ble.retry);
+  midi.ble = { device: null, ready: false, retry: null };
+  if (device) {
+    device.removeEventListener('gattserverdisconnected', bleMidiLost);
+    if (device.gatt.connected) device.gatt.disconnect();
+  }
+}
+
+function onBleMidi(event) {
+  const v = event.target.value;
+  parseBleMidi(new Uint8Array(v.buffer, v.byteOffset, v.byteLength), midiMessage);
+}
+
+// BLE MIDI packet: header (bit 7 set, timestamp high), then messages, each preceded by a timestamp byte (bit 7 set)
+// unless it continues with running status. SysEx and system messages are skipped. (As parse_packet in midi_ble.c.)
+function parseBleMidi(p, emit) {
+  const n = p.length;
+  if (n < 2 || !(p[0] & 0x80)) return;
+  let running = 0, sysex = false, i = 1;
+  while (i < n) {
+    if (p[i] & 0x80) {                       // timestamp
+      if (++i >= n) break;
+      if (p[i] & 0x80) {                     // status
+        const status = p[i++];
+        if (status === 0xF0) { sysex = true; continue; }
+        if (status === 0xF7) { sysex = false; continue; }
+        if (status >= 0xF8) continue;        // real-time (clock etc.)
+        running = status;
+        sysex = false;
+      }
+    }
+    if (sysex || !running) { i++; continue; }   // inside a SysEx or no status yet: skip the data byte
+    const type = running & 0xF0;
+    const count = type === 0xC0 || type === 0xD0 ? 1 : type >= 0x80 && type <= 0xE0 ? 2 : -1;
+    if (count < 0 || i + count > n) { running = 0; i++; continue; }
+    const d1 = p[i], d2 = count === 2 ? p[i + 1] : 0;
+    i += count;
+    if ((d1 | d2) & 0x80) continue;
+    emit(running, d1, d2);
+  }
 }

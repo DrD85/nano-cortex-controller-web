@@ -42,8 +42,9 @@ IR library, cab settings, capture tone and volume, tuner, the second effect on P
 
 **Differences to the board**
 
-- **MIDI**: the MIDI button uses the MIDI inputs of the computer (Web MIDI), for example a Morningstar MC6 over USB
-  or a WIDI paired with the computer, with the same mapping as on the board.
+- **MIDI**: the MIDI button lists the MIDI inputs of the computer (Web MIDI), for example a Morningstar MC6 over USB,
+  and **Bluetooth MIDI device …** for a Bluetooth MIDI controller (MC6 / MC8 Pro, WIDI), connected directly as on the
+  board – this also works on the iPhone (Bluefy), which has no Web MIDI. Same mapping as on the board.
 - Own banks, symbols, FX presets and the footswitch order are stored in the browser (on this computer, in this
   browser only).
 - No app bridge: the editor cannot connect through the page.
@@ -87,7 +88,8 @@ Android). Safari und Firefox können kein Web Bluetooth; auf dem iPhone/iPad geh
 Leiste für Verbinden, Vollbild (wo der Browser es erlaubt) und Zurück. Das Display bleibt an, solange der Nano
 verbunden ist. Am Computer oder Tablet schaltet **SCREEN** in dieselbe Ansicht. Auf dem iPhone mit **Bluefy**.
 
-**Unterschiede zum Board**: Der MIDI-Knopf nutzt die MIDI-Eingänge des Computers (z. B. ein MC6 per USB). Eigene
+**Unterschiede zum Board**: Der MIDI-Knopf zeigt die MIDI-Eingänge des Computers (z. B. ein MC6 per USB) und
+**Bluetooth MIDI device …** für einen Bluetooth-MIDI-Controller (MC6/MC8 Pro, WIDI) – das geht auch am iPhone (Bluefy). Eigene
 Bänke, Symbole, FX-Presets und die Fußschalter-Reihenfolge werden im Browser gespeichert. Die App-Brücke für den
 Editor gibt es nicht.
 
