@@ -26,8 +26,12 @@ function setStatus(text, kind = '') {
 const M = {
   ctx,
   nanoWrite(bytes) {
-    if (!link.c304) { setTimeout(() => M._web_nano_written(0)); return; }
-    link.c304.writeValueWithResponse(bytes).then(
+    const ch = link.c304;
+    // Always answered later; writeValue for browsers without writeValueWithResponse (older Bluefy on the iPhone)
+    Promise.resolve().then(() => {
+      if (!ch) throw new Error('not connected');
+      return ch.writeValueWithResponse ? ch.writeValueWithResponse(bytes) : ch.writeValue(bytes);
+    }).then(
       () => M._web_nano_written(1),
       (e) => { console.warn('Write failed', e); M._web_nano_written(0); });
   },
@@ -64,26 +68,36 @@ function onNotify(event) {
   toFirmware(new Uint8Array(v.buffer, v.byteOffset, v.byteLength), (p, n) => M._web_nano_packet(p, n));
 }
 
+// C304 (write) and C305 (notify) under service A002 or A003. Asked for by UUID: browsers report UUIDs in different
+// forms (Bluefy on the iPhone e.g. in capitals or as "C304"), so the lists are not compared as text.
+async function findCharacteristics(server) {
+  const seen = [];
+  for (const uuid of SERVICE_UUIDS) {
+    let service;
+    try { service = await server.getPrimaryService(uuid); } catch (e) { continue; }
+    try {
+      return { c304: await service.getCharacteristic(C304_UUID), c305: await service.getCharacteristic(C305_UUID) };
+    } catch (e) {
+      try { for (const ch of await service.getCharacteristics()) seen.push(ch.uuid); } catch (e2) {}
+    }
+  }
+  return { seen };
+}
+
 async function openLink() {
   const device = link.device;
   setStatus('Connecting to ' + (device.name || 'the device') + ' ...', 'busy');
   const server = await device.gatt.connect();
   link.c304 = link.c305 = null;
-  for (const uuid of SERVICE_UUIDS) {
-    let service;
-    try { service = await server.getPrimaryService(uuid); } catch (e) { continue; }
-    for (const ch of await service.getCharacteristics()) {
-      if (ch.uuid === C304_UUID) link.c304 = ch;
-      if (ch.uuid === C305_UUID) link.c305 = ch;
-    }
-    if (link.c304 && link.c305) break;
-  }
-  if (!link.c304 || !link.c305) {
-    link.c304 = link.c305 = null;
+  const found = await findCharacteristics(server);
+  if (!found.c304) {
     link.userClosed = true;
     device.gatt.disconnect();
-    throw new Error('"' + (device.name || 'This device') + '" is not a Nano Cortex.');
+    throw new Error('"' + (device.name || 'This device') + '" is not a Nano Cortex (no C304/C305' +
+      (found.seen.length ? ', found ' + found.seen.join(', ') : '') + ').');
   }
+  link.c304 = found.c304;
+  link.c305 = found.c305;
   link.c305.addEventListener('characteristicvaluechanged', onNotify);   // the same listener is added only once
   await link.c305.startNotifications();
   link.ready = true;
