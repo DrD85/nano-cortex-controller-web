@@ -118,8 +118,26 @@
   footer { margin-top: 22px; color: #6f6f6f; font-size: 13px; text-align: center; }
   footer a { color: #9a9a9a; }
 
-  /* ---- screen only: the board's screen as large as possible (phones in landscape by themselves) ---- */
+  /* ---- screen only: the board's screen as large as possible (phones in landscape by themselves) ----
+     --W/--H and the insets describe the landscape area the view uses. A phone held upright (or with rotation lock)
+     gets the view turned by 90 degrees ("rotated"): hold it sideways. */
   .mini-bar, #toast { display: none; }
+  html.screen-only {
+    --W: 100vw; --H: 100vh;
+    --il: env(safe-area-inset-left); --ir: env(safe-area-inset-right);
+    --it: env(safe-area-inset-top); --ib: env(safe-area-inset-bottom);
+  }
+  @supports (height: 100dvh) { html.screen-only { --H: 100dvh; } }
+  html.screen-only.rotated {
+    --W: 100vh; --H: 100vw;
+    --il: env(safe-area-inset-top); --ir: env(safe-area-inset-bottom);
+    --it: env(safe-area-inset-right); --ib: env(safe-area-inset-left);
+  }
+  @supports (height: 100dvh) { html.screen-only.rotated { --W: 100dvh; } }
+  html.screen-only.rotated body {
+    position: fixed; top: 0; left: 0; width: var(--W); height: var(--H); min-height: 0;
+    transform-origin: top left; transform: rotate(90deg) translateY(-100%);
+  }
   html.screen-only, html.screen-only body { height: 100%; overflow: hidden; overscroll-behavior: none; }
   html.screen-only body {
     padding: 0; background: #000; touch-action: none;
@@ -128,21 +146,18 @@
   html.screen-only header, html.screen-only .switches, html.screen-only .help, html.screen-only footer { display: none; }
   html.screen-only .device {
     position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    padding: var(--it) var(--ir) var(--ib) var(--il);
     background: #000; border: 0; border-radius: 0; box-shadow: none;
   }
   html.screen-only .bezel { padding: 0; background: none; box-shadow: none; border-radius: 0; }
   html.screen-only canvas {
     --bar: 54px;   /* room for the control bar on the right (and the same on the left, so it stays centred) */
-    width: min(calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 2 * var(--bar)),
-               calc((100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 5 / 3));
-    width: min(calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 2 * var(--bar)),
-               calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 5 / 3));
+    width: min(calc(var(--W) - var(--il) - var(--ir) - 2 * var(--bar)), calc((var(--H) - var(--it) - var(--ib)) * 5 / 3));
     border-radius: 0;
   }
   html.screen-only .mini-bar {
     display: flex; flex-direction: column; gap: 12px; position: fixed; z-index: 2;
-    right: calc(env(safe-area-inset-right) + 5px); top: 50%; transform: translateY(-50%);
+    right: calc(var(--ir) + 5px); top: 50%; transform: translateY(-50%);
   }
   .mini-bar button {
     all: unset; box-sizing: border-box; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
@@ -159,8 +174,8 @@
   #mini-connect:not([data-kind="ok"]):not([data-kind="busy"]) { animation: pulse 1.8s ease-in-out infinite; }
   @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(69, 227, 95, .18); border-color: #2c7a3a; } }
   html.screen-only #toast:not([hidden]) {
-    display: block; position: fixed; z-index: 3; left: 50%; top: calc(env(safe-area-inset-top) + 8px);
-    transform: translateX(-50%); max-width: min(90vw, 560px); padding: 8px 14px; border-radius: 10px;
+    display: block; position: fixed; z-index: 3; left: 50%; top: calc(var(--it) + 8px);
+    transform: translateX(-50%); max-width: min(90%, 560px); padding: 8px 14px; border-radius: 10px;
     background: rgba(20, 22, 25, .94); border: 1px solid #34373b; font-size: 13px; text-align: center; pointer-events: none;
   }
   #toast[data-kind="error"] { color: #ffb4b4; }
@@ -239,7 +254,7 @@
   </button>
 </div>
 <div id="toast" hidden></div>
-<script src="nano-controller.js"></script>
-<script src="app.js"></script>
+<script src="nano-controller.js?v=bbe13faa07"></script>
+<script src="app.js?v=32430565db"></script>
 </body>
 </html>

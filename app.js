@@ -206,9 +206,12 @@ async function keepAwake(on) {
 document.addEventListener('visibilitychange', () => { if (link.ready) keepAwake(true); });   // released when hidden
 
 // ---- screen only: the board's screen as large as possible ----
-// Phones in landscape switch by themselves; SCREEN (or ?screen in the address) switches on a computer.
+// Phones in landscape switch by themselves; SCREEN (or ?screen in the address) switches on a computer. A phone or
+// tablet held upright (or with rotation lock on) gets the view turned by 90 degrees: hold it sideways.
 
 const phoneLandscape = matchMedia('(pointer: coarse) and (orientation: landscape) and (max-height: 520px)');
+const touchDevice = matchMedia('(pointer: coarse)');
+let screenOn = false;
 let screenMode = new URLSearchParams(location.search).has('screen') ? 'on' : 'auto';   // auto, on or off
 const fullscreenOk = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
 document.getElementById('mini-full').hidden = !fullscreenOk;
@@ -220,14 +223,17 @@ function inFullscreen() {
 function applyScreenMode() {
   const on = screenMode === 'on' || (screenMode === 'auto' && phoneLandscape.matches);
   root.classList.toggle('screen-only', on);
+  root.classList.toggle('rotated', on && touchDevice.matches && innerHeight > innerWidth);
   if (!on && inFullscreen()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-  if (on && !link.ready) showToast(statusText.textContent + ' - tap the Bluetooth button to connect', statusText.dataset.kind);
+  if (on && !screenOn && !link.ready) showToast(statusText.textContent + ' - tap the Bluetooth button to connect', statusText.dataset.kind);
+  screenOn = on;
 }
 
 phoneLandscape.addEventListener('change', () => {
   if (screenMode === 'off' && !phoneLandscape.matches) screenMode = 'auto';   // next time sideways again
   applyScreenMode();
 });
+window.addEventListener('resize', applyScreenMode);
 document.getElementById('screen-button').addEventListener('click', () => { screenMode = 'on'; applyScreenMode(); });
 document.getElementById('mini-exit').addEventListener('click', () => {
   screenMode = phoneLandscape.matches ? 'off' : 'auto';
@@ -250,6 +256,9 @@ let pointerDown = false;
 
 function screenPoint(e) {
   const r = canvas.getBoundingClientRect();
+  if (root.classList.contains('rotated')) {   // turned by 90 degrees: the screen's top edge is on the right
+    return [Math.round((e.clientY - r.top) * SCREEN_W / r.height), Math.round((r.right - e.clientX) * SCREEN_H / r.width)];
+  }
   return [Math.round((e.clientX - r.left) * SCREEN_W / r.width), Math.round((e.clientY - r.top) * SCREEN_H / r.height)];
 }
 

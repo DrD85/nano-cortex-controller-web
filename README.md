@@ -33,7 +33,8 @@ Cortex**.
 
 **On a phone**: turn it sideways and the page shows only the controller's screen, as large as possible, with a small
 bar for connecting, full screen (where the browser allows it) and back. The display stays on while the Nano is
-connected. On a computer or tablet, **SCREEN** switches to the same view (or open the page with `?screen`).
+connected. **SCREEN** switches to the same view on a computer or tablet (or open the page with `?screen`); on a phone
+held upright – or with rotation lock on – it turns the view by 90°, so hold the phone sideways.
 On the iPhone use the **Bluefy** browser.
 
 Everything the board does is there: presets and own banks, FX mode with the FX editor and FX presets, capture and
@@ -86,7 +87,8 @@ Android). Safari und Firefox können kein Web Bluetooth; auf dem iPhone/iPad geh
 
 **Am Handy**: quer halten – dann zeigt die Seite nur den Controller-Bildschirm, so groß wie möglich, mit einer kleinen
 Leiste für Verbinden, Vollbild (wo der Browser es erlaubt) und Zurück. Das Display bleibt an, solange der Nano
-verbunden ist. Am Computer oder Tablet schaltet **SCREEN** in dieselbe Ansicht. Auf dem iPhone mit **Bluefy**.
+verbunden ist. **SCREEN** schaltet am Computer oder Tablet in dieselbe Ansicht; am Handy hochkant – oder mit
+Ausrichtungssperre – dreht es die Ansicht um 90°, dann das Handy quer halten. Auf dem iPhone mit **Bluefy**.
 
 **Unterschiede zum Board**: Der MIDI-Knopf zeigt die MIDI-Eingänge des Computers (z. B. ein MC6 per USB) und
 **Bluetooth MIDI device …** für einen Bluetooth-MIDI-Controller (MC6/MC8 Pro, WIDI) – das geht auch am iPhone (Bluefy). Eigene
