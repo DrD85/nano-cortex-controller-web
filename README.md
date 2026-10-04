@@ -26,7 +26,8 @@ Cortex**.
 1. Close other apps that use the Nano over Bluetooth (Cortex Cloud, the
    [Nano Cortex Editor](https://github.com/DrD85/nano-cortex-editor)) and switch off a controller board: the Nano
    takes one Bluetooth connection at a time.
-2. Open the page, click **CONNECT** and choose your Nano Cortex.
+2. Open the page, click **CONNECT** and choose your Nano Cortex. It also works offline: *Code → Download ZIP*,
+   unzip and open `index.html` in Chrome or Edge.
 3. The screen works like the touch screen: tap, hold, swipe. The eight footswitches below it work like the real ones:
    click, or hold for 0.6 s for their held function. The keys **1–8** press them too.
 
@@ -72,7 +73,8 @@ Android). Safari und Firefox können kein Web Bluetooth; auf dem iPhone/iPad geh
 
 1. Andere Apps mit Bluetooth-Verbindung zum Nano schließen (Cortex Cloud, Nano Cortex Editor) und ein Controller-Board
    ausschalten – der Nano nimmt nur eine Bluetooth-Verbindung an.
-2. Seite öffnen, **CONNECT** klicken und den Nano Cortex wählen.
+2. Seite öffnen, **CONNECT** klicken und den Nano Cortex wählen. Geht auch offline: *Code → Download ZIP*,
+   entpacken und `index.html` in Chrome oder Edge öffnen.
 3. Der Bildschirm funktioniert wie der Touchscreen (tippen, halten, wischen). Die acht Fußschalter darunter wie die
    echten: klicken oder 0,6 s halten für die Haltefunktion. Die Tasten **1–8** drücken sie ebenfalls.
 
