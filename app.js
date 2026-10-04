@@ -32,7 +32,9 @@ const M = {
       (e) => { console.warn('Write failed', e); M._web_nano_written(0); });
   },
   midiSearch(on) { setTimeout(() => midiSearch(on)); },
-  midiUse(name) { setTimeout(() => midiUse(name)); },
+  midiConnect(index) { setTimeout(() => midiConnect(index)); },
+  midiForget() { setTimeout(midiForget); },
+  midiResume() { setTimeout(midiResume); },
   print: (text) => console.log(text),
   printErr: (text) => console.warn(text),
 };
@@ -230,7 +232,24 @@ window.addEventListener('blur', () => {
 
 // ---- Web MIDI: a MIDI input of the computer instead of Bluetooth MIDI ----
 
-const midi = { access: null, input: null, wanted: '' };
+const MIDI_KEY = 'nano-controller:midi';   // the chosen input (full name)
+const midi = { access: null, input: null, wanted: '', list: [] };
+const midiLine = document.getElementById('midi-line');
+
+function midiShow(message) {
+  midiLine.hidden = !midi.wanted;
+  if (!midi.wanted) return;
+  const name = '<b>' + (midi.input ? midi.input.name : midi.wanted).replace(/[<&]/g, '') + '</b>';
+  midiLine.innerHTML = 'MIDI: ' + name + (midi.input ? '' : ' (not found - connected to this computer?)') +
+    (message ? ' - received <span class="hit">' + message + '</span>' : midi.input ? ' - waiting for messages' : '');
+}
+
+function midiDescribe(d) {
+  const type = d[0] & 0xF0, ch = (d[0] & 0x0F) + 1;
+  if (type === 0xB0) return 'CC ' + d[1] + ' = ' + d[2] + ' (channel ' + ch + ')';
+  if (type === 0xC0) return 'PC ' + d[1] + ' (channel ' + ch + ')';
+  return Array.from(d).map((b) => b.toString(16).padStart(2, '0')).join(' ');
+}
 
 async function midiAccess() {
   if (midi.access) return midi.access;
@@ -247,9 +266,12 @@ async function midiAccess() {
 
 function midiList() {
   M._web_midi_inputs_clear();
+  midi.list = [];   // in the order the screen shows them
   if (midi.access) {
     for (const input of midi.access.inputs.values()) {
-      if (input.state === 'connected') M.ccall('web_midi_input', null, ['string'], [input.name || 'MIDI input']);
+      if (input.state !== 'connected') continue;
+      midi.list.push(input);
+      M.ccall('web_midi_input', null, ['string'], [input.name || 'MIDI input']);
     }
   }
   M._web_midi_changed(midi.input ? 1 : 0);
@@ -261,22 +283,50 @@ async function midiSearch(on) {
   midiList();
 }
 
-async function midiUse(name) {
-  midi.wanted = name;
-  if (name) await midiAccess();
+function midiStore(name) {
+  try {
+    if (name) localStorage.setItem(MIDI_KEY, name);
+    else localStorage.removeItem(MIDI_KEY);
+  } catch (e) {}
+}
+
+function midiConnect(index) {
+  const input = midi.list[index];
+  if (!input) return;
+  midi.wanted = input.name || '';
+  midiStore(midi.wanted);
+  midiAttach();
+}
+
+function midiForget() {
+  midi.wanted = '';
+  midiStore('');
+  midiAttach();
+}
+
+async function midiResume() {
+  try { midi.wanted = localStorage.getItem(MIDI_KEY) || ''; } catch (e) { midi.wanted = ''; }
+  if (midi.wanted) await midiAccess();
   midiAttach();
 }
 
 function onMidi(e) {
   const d = e.data;
-  if (d.length && d[0] >= 0x80 && d[0] < 0xF0) M._web_midi_message(d[0], d[1] || 0, d[2] || 0);
+  if (!d.length || d[0] >= 0xF0) return;   // clock and other system messages
+  midiShow(midiDescribe(d));
+  if (d[0] >= 0x80) M._web_midi_message(d[0], d[1] || 0, d[2] || 0);
+}
+
+// Names stored by the first version of this page were shortened to 31 characters.
+function midiMatches(input) {
+  return input.name === midi.wanted || (midi.wanted.length >= 31 && (input.name || '').startsWith(midi.wanted));
 }
 
 function midiAttach() {
   let found = null;
   if (midi.access && midi.wanted) {
     for (const input of midi.access.inputs.values()) {
-      if (input.name === midi.wanted && input.state === 'connected') found = input;
+      if (midiMatches(input) && input.state === 'connected') found = input;
     }
   }
   if (found !== midi.input) {
@@ -284,5 +334,6 @@ function midiAttach() {
     midi.input = found;
     if (found) found.onmidimessage = onMidi;
   }
+  midiShow();
   M._web_midi_changed(found ? 1 : 0);
 }

@@ -47,6 +47,9 @@
   #status[data-kind="busy"]::before { background: var(--orange); }
   #status[data-kind="error"] { color: #ffb4b4; }
   #status[data-kind="error"]::before { background: var(--red); }
+  #midi-line { flex-basis: 100%; color: var(--muted); font-size: 13px; letter-spacing: .04em; }
+  #midi-line b { color: var(--text); font-weight: 600; }
+  #midi-line .hit { color: var(--green); }
   #connect {
     font: inherit; font-weight: 700; font-size: 14px; letter-spacing: .14em; color: #06150a;
     background: linear-gradient(#5cf074, #33c24b); border: 0; border-radius: 10px; padding: 10px 22px;
@@ -126,6 +129,7 @@
       <span id="status">Not connected</span>
       <button id="connect" type="button">CONNECT</button>
     </div>
+    <div id="midi-line" hidden></div>
   </header>
 
   <div class="device">
