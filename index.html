@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nano Cortex Controller</title>
+<meta name="description" content="The Nano Cortex Controller board in the browser: the same screen and functions, connected to the Nano Cortex over Web Bluetooth.">
+<style>
+  :root {
+    --bg: #060708;
+    --panel-top: #1a1c1f;
+    --panel-bottom: #0c0d0f;
+    --border: #2e2e2e;
+    --text: #f2f2f2;
+    --muted: #9a9a9a;
+    --green: #45e35f;
+    --orange: #ff9f1a;
+    --red: #ff5a5a;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(ellipse at 50% -10%, #1b1e22 0%, var(--bg) 60%);
+    color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    padding: 20px 16px 32px;
+  }
+  .wrap { width: min(100%, 1000px); margin: 0 auto; }
+
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px;
+    margin-bottom: 16px;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .brand h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: .02em; }
+  .brand span { color: var(--muted); font-size: 13px; letter-spacing: .14em; text-transform: uppercase; }
+  .actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; min-width: 0; }
+  #status { color: var(--muted); font-size: 13px; letter-spacing: .04em; min-width: 0; overflow-wrap: anywhere; }
+  #status::before {
+    content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    background: #555; margin-right: 8px; vertical-align: 1px;
+  }
+  #status[data-kind="ok"] { color: var(--text); }
+  #status[data-kind="ok"]::before { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  #status[data-kind="busy"]::before { background: var(--orange); }
+  #status[data-kind="error"] { color: #ffb4b4; }
+  #status[data-kind="error"]::before { background: var(--red); }
+  #connect {
+    font: inherit; font-weight: 700; font-size: 14px; letter-spacing: .14em; color: #06150a;
+    background: linear-gradient(#5cf074, #33c24b); border: 0; border-radius: 10px; padding: 10px 22px;
+    cursor: pointer; box-shadow: 0 0 0 1px #1d6a2a inset, 0 6px 18px rgba(69, 227, 95, .18);
+  }
+  #connect:hover { filter: brightness(1.08); }
+  #connect:active { transform: translateY(1px); }
+
+  .device {
+    background: linear-gradient(var(--panel-top), var(--panel-bottom));
+    border: 1px solid var(--border); border-radius: 22px; padding: clamp(10px, 2.2vw, 22px);
+    box-shadow: 0 30px 60px rgba(0, 0, 0, .55), 0 1px 0 rgba(255, 255, 255, .05) inset;
+  }
+  .bezel {
+    background: #000; border-radius: 12px; padding: clamp(6px, 1.2vw, 12px);
+    box-shadow: 0 0 0 1px #000, 0 0 0 2px #26282b;
+  }
+  canvas {
+    display: block; width: 100%; height: auto; aspect-ratio: 800 / 480; background: #000;
+    border-radius: 3px; touch-action: none; cursor: pointer;
+  }
+
+  .switches {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(10px, 2.4vw, 26px) 0;
+    margin-top: clamp(14px, 3vw, 30px); padding: 0 clamp(6px, 1.2vw, 12px);
+  }
+  .fs {
+    all: unset; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;
+    -webkit-tap-highlight-color: transparent; touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  .fs .knob {
+    width: clamp(46px, 8vw, 74px); aspect-ratio: 1; border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, #2a2c30 58%, #0b0c0d 60%, #3a3d42 66%, #121315 72%);
+    display: grid; place-items: center; box-shadow: 0 8px 14px rgba(0, 0, 0, .6);
+  }
+  .fs .knob::after {
+    content: ""; width: 56%; aspect-ratio: 1; border-radius: 50%;
+    background: radial-gradient(circle at 36% 30%, #ffffff 0%, #d4d7db 22%, #8e9298 58%, #4a4d52 100%);
+    box-shadow: 0 3px 5px rgba(0, 0, 0, .6), 0 0 0 1px rgba(0, 0, 0, .5);
+    transition: transform .05s;
+  }
+  .fs.down .knob::after { transform: scale(.9); filter: brightness(.82); }
+  .fs:focus-visible .knob { outline: 2px solid var(--green); outline-offset: 3px; }
+  .fs .cap { font-size: 12px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+  .fs .cap b { color: var(--text); font-weight: 700; margin-right: 6px; }
+
+  .help {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 22px;
+  }
+  .help div {
+    background: linear-gradient(#141619, #0b0c0e); border: 1px solid #232528; border-radius: 12px;
+    padding: 14px 16px; color: #c9c9c9; font-size: 14px;
+  }
+  .help h2 { margin: 0 0 6px; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  .help p { margin: 0; }
+  kbd {
+    font: 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 2px 6px; border-radius: 5px;
+    border: 1px solid #3a3d42; background: #1b1d20; color: var(--text);
+  }
+  footer { margin-top: 22px; color: #6f6f6f; font-size: 13px; text-align: center; }
+  footer a { color: #9a9a9a; }
+
+  @media (max-width: 560px) {
+    .brand h1 { font-size: 19px; }
+    .fs .cap { font-size: 10px; letter-spacing: .08em; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>Nano Cortex Controller</h1>
+      <span>in the browser</span>
+    </div>
+    <div class="actions">
+      <span id="status">Not connected</span>
+      <button id="connect" type="button">CONNECT</button>
+    </div>
+  </header>
+
+  <div class="device">
+    <div class="bezel"><canvas id="screen" width="800" height="480" aria-label="Controller screen"></canvas></div>
+    <div class="switches" aria-label="Footswitches">
+      <button class="fs" type="button" data-n="1"><span class="knob"></span><span class="cap"><b>1</b>Mode</span></button>
+      <button class="fs" type="button" data-n="2"><span class="knob"></span><span class="cap"><b>2</b>Tuner</span></button>
+      <button class="fs" type="button" data-n="3"><span class="knob"></span><span class="cap"><b>3</b></span></button>
+      <button class="fs" type="button" data-n="4"><span class="knob"></span><span class="cap"><b>4</b></span></button>
+      <button class="fs" type="button" data-n="5"><span class="knob"></span><span class="cap"><b>5</b></span></button>
+      <button class="fs" type="button" data-n="6"><span class="knob"></span><span class="cap"><b>6</b></span></button>
+      <button class="fs" type="button" data-n="7"><span class="knob"></span><span class="cap"><b>7</b></span></button>
+      <button class="fs" type="button" data-n="8"><span class="knob"></span><span class="cap"><b>8</b></span></button>
+    </div>
+  </div>
+
+  <section class="help">
+    <div>
+      <h2>Connect</h2>
+      <p>Chrome or Edge on a computer or Android phone. Click <b>CONNECT</b> and choose your Nano Cortex.
+        The Nano takes one connection at a time: close the editor and switch off a controller board first.</p>
+    </div>
+    <div>
+      <h2>Use it</h2>
+      <p>The screen works like the touch screen: tap, hold, swipe. The eight footswitches below work like the real
+        ones: click, or hold for 0.6 s for their held function. Keys <kbd>1</kbd>–<kbd>8</kbd> press them too.</p>
+    </div>
+    <div>
+      <h2>MIDI</h2>
+      <p>The MIDI button on the screen uses the MIDI inputs of this computer, for example an MC6 over USB.
+        Banks, symbols and FX presets are stored in this browser.</p>
+    </div>
+  </section>
+
+  <footer>
+    Unofficial community project – not affiliated with Neural DSP.
+    <a href="https://github.com/DrD85/nano-cortex-controller">Source on GitHub</a> ·
+    <a href="THIRD-PARTY.txt">Licences</a>
+  </footer>
+</div>
+<script src="nano-controller.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
