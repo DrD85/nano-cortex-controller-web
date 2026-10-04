@@ -13,10 +13,27 @@ const canvas = document.getElementById('screen');
 const ctx = canvas.getContext('2d', { alpha: false });
 const connectButton = document.getElementById('connect');
 const statusText = document.getElementById('status');
+const root = document.documentElement;
+const miniConnect = document.getElementById('mini-connect');
+const toast = document.getElementById('toast');
+let toastTimer = null;
 
 function setStatus(text, kind = '') {
   statusText.textContent = text;
   statusText.dataset.kind = kind;
+  miniConnect.dataset.kind = kind;
+  miniConnect.title = text;
+  showToast(text, kind);
+}
+
+// A short message over the screen (screen-only mode has no status line).
+function showToast(text, kind = '') {
+  if (!root.classList.contains('screen-only')) return;
+  toast.textContent = text;
+  toast.dataset.kind = kind;
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.hidden = true; }, kind === 'error' ? 6000 : 2500);
 }
 
 // ---- the firmware ----
@@ -101,6 +118,7 @@ async function openLink() {
   link.c305.addEventListener('characteristicvaluechanged', onNotify);   // the same listener is added only once
   await link.c305.startNotifications();
   link.ready = true;
+  keepAwake(true);
   connectButton.textContent = 'DISCONNECT';
   setStatus('Connected: ' + (device.name || 'Nano Cortex'), 'ok');
   M._web_nano_link(1);
@@ -113,6 +131,7 @@ function onDisconnected() {
   if (was) M._web_nano_link(0);
   connectButton.textContent = 'CONNECT';
   if (link.userClosed || !link.device) {
+    keepAwake(false);
     setStatus('Not connected');
     return;
   }
@@ -165,6 +184,65 @@ connectButton.addEventListener('click', () => {
   }
   connect();
 });
+
+// The display stays on while the Nano is connected (where the browser allows it).
+let wakeLock = null;
+
+async function keepAwake(on) {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    if (on && !wakeLock && document.visibilityState === 'visible') {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!on && wakeLock) {
+      await wakeLock.release();
+      wakeLock = null;
+    }
+  } catch (e) {
+    console.warn('Screen stays not awake', e);
+  }
+}
+
+document.addEventListener('visibilitychange', () => { if (link.ready) keepAwake(true); });   // released when hidden
+
+// ---- screen only: the board's screen as large as possible ----
+// Phones in landscape switch by themselves; SCREEN (or ?screen in the address) switches on a computer.
+
+const phoneLandscape = matchMedia('(pointer: coarse) and (orientation: landscape) and (max-height: 520px)');
+let screenMode = new URLSearchParams(location.search).has('screen') ? 'on' : 'auto';   // auto, on or off
+const fullscreenOk = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+document.getElementById('mini-full').hidden = !fullscreenOk;
+
+function inFullscreen() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+function applyScreenMode() {
+  const on = screenMode === 'on' || (screenMode === 'auto' && phoneLandscape.matches);
+  root.classList.toggle('screen-only', on);
+  if (!on && inFullscreen()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  if (on && !link.ready) showToast(statusText.textContent + ' - tap the Bluetooth button to connect', statusText.dataset.kind);
+}
+
+phoneLandscape.addEventListener('change', () => {
+  if (screenMode === 'off' && !phoneLandscape.matches) screenMode = 'auto';   // next time sideways again
+  applyScreenMode();
+});
+document.getElementById('screen-button').addEventListener('click', () => { screenMode = 'on'; applyScreenMode(); });
+document.getElementById('mini-exit').addEventListener('click', () => {
+  screenMode = phoneLandscape.matches ? 'off' : 'auto';
+  applyScreenMode();
+});
+document.getElementById('mini-full').addEventListener('click', () => {
+  if (inFullscreen()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  else (root.requestFullscreen || root.webkitRequestFullscreen).call(root);
+});
+miniConnect.addEventListener('click', () => {
+  if (!started) return;
+  if (link.ready || (link.retry && !link.userClosed)) showToast(statusText.textContent, statusText.dataset.kind);
+  else connect();
+});
+applyScreenMode();
 
 // ---- touch screen: mouse or finger on the canvas ----
 

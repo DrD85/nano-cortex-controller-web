@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Nano Cortex Controller</title>
 <meta name="description" content="The Nano Cortex Controller board in the browser: the same screen and functions, connected to the Nano Cortex over Web Bluetooth.">
 <style>
@@ -57,6 +57,11 @@
   }
   #connect:hover { filter: brightness(1.08); }
   #connect:active { transform: translateY(1px); }
+  #screen-button {
+    font: inherit; font-weight: 700; font-size: 13px; letter-spacing: .14em; color: var(--text);
+    background: #1c1e21; border: 1px solid #34373b; border-radius: 10px; padding: 10px 16px; cursor: pointer;
+  }
+  #screen-button:hover { background: #24272b; }
 
   .device {
     background: linear-gradient(var(--panel-top), var(--panel-bottom));
@@ -70,6 +75,7 @@
   canvas {
     display: block; width: 100%; height: auto; aspect-ratio: 800 / 480; background: #000;
     border-radius: 3px; touch-action: none; cursor: pointer;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;   /* no magnifier on long presses */
   }
 
   .switches {
@@ -112,8 +118,56 @@
   footer { margin-top: 22px; color: #6f6f6f; font-size: 13px; text-align: center; }
   footer a { color: #9a9a9a; }
 
+  /* ---- screen only: the board's screen as large as possible (phones in landscape by themselves) ---- */
+  .mini-bar, #toast { display: none; }
+  html.screen-only, html.screen-only body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  html.screen-only body {
+    padding: 0; background: #000; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  }
+  html.screen-only header, html.screen-only .switches, html.screen-only .help, html.screen-only footer { display: none; }
+  html.screen-only .device {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: #000; border: 0; border-radius: 0; box-shadow: none;
+  }
+  html.screen-only .bezel { padding: 0; background: none; box-shadow: none; border-radius: 0; }
+  html.screen-only canvas {
+    --bar: 54px;   /* room for the control bar on the right (and the same on the left, so it stays centred) */
+    width: min(calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 2 * var(--bar)),
+               calc((100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 5 / 3));
+    width: min(calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 2 * var(--bar)),
+               calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 5 / 3));
+    border-radius: 0;
+  }
+  html.screen-only .mini-bar {
+    display: flex; flex-direction: column; gap: 12px; position: fixed; z-index: 2;
+    right: calc(env(safe-area-inset-right) + 5px); top: 50%; transform: translateY(-50%);
+  }
+  .mini-bar button {
+    all: unset; box-sizing: border-box; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(36, 38, 42, .9); border: 1px solid #34373b; color: #d8d8d8; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mini-bar button[hidden] { display: none; }
+  .mini-bar button:active { background: #2e3136; }
+  .mini-bar svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  #mini-connect { color: #8a8a8a; }
+  #mini-connect[data-kind="ok"] { color: var(--green); border-color: #1d6a2a; }
+  #mini-connect[data-kind="busy"] { color: var(--orange); }
+  #mini-connect[data-kind="error"] { color: var(--red); }
+  #mini-connect:not([data-kind="ok"]):not([data-kind="busy"]) { animation: pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(69, 227, 95, .18); border-color: #2c7a3a; } }
+  html.screen-only #toast:not([hidden]) {
+    display: block; position: fixed; z-index: 3; left: 50%; top: calc(env(safe-area-inset-top) + 8px);
+    transform: translateX(-50%); max-width: min(90vw, 560px); padding: 8px 14px; border-radius: 10px;
+    background: rgba(20, 22, 25, .94); border: 1px solid #34373b; font-size: 13px; text-align: center; pointer-events: none;
+  }
+  #toast[data-kind="error"] { color: #ffb4b4; }
+
   @media (max-width: 560px) {
     .brand h1 { font-size: 19px; }
+    #status { flex-basis: 100%; }
     .fs .cap { font-size: 10px; letter-spacing: .08em; }
   }
 </style>
@@ -127,6 +181,7 @@
     </div>
     <div class="actions">
       <span id="status">Not connected</span>
+      <button id="screen-button" type="button" title="Only the screen, as large as possible">SCREEN</button>
       <button id="connect" type="button">CONNECT</button>
     </div>
     <div id="midi-line" hidden></div>
@@ -155,7 +210,8 @@
     <div>
       <h2>Use it</h2>
       <p>The screen works like the touch screen: tap, hold, swipe. The eight footswitches below work like the real
-        ones: click, or hold for 0.6 s for their held function. Keys <kbd>1</kbd>–<kbd>8</kbd> press them too.</p>
+        ones: click, or hold for 0.6 s for their held function. Keys <kbd>1</kbd>–<kbd>8</kbd> press them too.
+        On a phone, turn it sideways for the screen alone (<b>SCREEN</b> does the same on a computer).</p>
     </div>
     <div>
       <h2>MIDI</h2>
@@ -170,6 +226,18 @@
     <a href="THIRD-PARTY.txt">Licences</a>
   </footer>
 </div>
+<div class="mini-bar" aria-label="Controls">
+  <button id="mini-connect" type="button" title="Connect">
+    <svg viewBox="0 0 24 24"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg>
+  </button>
+  <button id="mini-full" type="button" title="Full screen" hidden>
+    <svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>
+  </button>
+  <button id="mini-exit" type="button" title="Back to the page">
+    <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </button>
+</div>
+<div id="toast" hidden></div>
 <script src="nano-controller.js"></script>
 <script src="app.js"></script>
 </body>

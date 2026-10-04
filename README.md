@@ -31,6 +31,11 @@ Cortex**.
 3. The screen works like the touch screen: tap, hold, swipe. The eight footswitches below it work like the real ones:
    click, or hold for 0.6 s for their held function. The keys **1–8** press them too.
 
+**On a phone**: turn it sideways and the page shows only the controller's screen, as large as possible, with a small
+bar for connecting, full screen (where the browser allows it) and back. The display stays on while the Nano is
+connected. On a computer or tablet, **SCREEN** switches to the same view (or open the page with `?screen`).
+On the iPhone use the **Bluefy** browser.
+
 Everything the board does is there: presets and own banks, FX mode with the FX editor and FX presets, capture and
 IR library, cab settings, capture tone and volume, tuner, the second effect on Pre FX 1, the reverb switch. See the
 [controller's README](https://github.com/DrD85/nano-cortex-controller#using-it) for the details.
@@ -77,6 +82,10 @@ Android). Safari und Firefox können kein Web Bluetooth; auf dem iPhone/iPad geh
    entpacken und `index.html` in Chrome oder Edge öffnen.
 3. Der Bildschirm funktioniert wie der Touchscreen (tippen, halten, wischen). Die acht Fußschalter darunter wie die
    echten: klicken oder 0,6 s halten für die Haltefunktion. Die Tasten **1–8** drücken sie ebenfalls.
+
+**Am Handy**: quer halten – dann zeigt die Seite nur den Controller-Bildschirm, so groß wie möglich, mit einer kleinen
+Leiste für Verbinden, Vollbild (wo der Browser es erlaubt) und Zurück. Das Display bleibt an, solange der Nano
+verbunden ist. Am Computer oder Tablet schaltet **SCREEN** in dieselbe Ansicht. Auf dem iPhone mit **Bluefy**.
 
 **Unterschiede zum Board**: Der MIDI-Knopf nutzt die MIDI-Eingänge des Computers (z. B. ein MC6 per USB). Eigene
 Bänke, Symbole, FX-Presets und die Fußschalter-Reihenfolge werden im Browser gespeichert. Die App-Brücke für den
