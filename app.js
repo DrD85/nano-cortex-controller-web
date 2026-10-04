@@ -220,10 +220,38 @@ function inFullscreen() {
   return !!(document.fullscreenElement || document.webkitFullscreenElement);
 }
 
+// The screen as large as possible without distortion: the visible area, its full height (also the strip of the
+// home indicator), the control bar beside it on the right. Centred if there is room.
+const device = document.querySelector('.device');
+const safeProbe = document.getElementById('safe-probe');
+const BAR_WIDTH = 54;   // control bar (44 px) and its gap
+
+function layoutScreen() {
+  const on = root.classList.contains('screen-only');
+  device.classList.toggle('sized', on);
+  if (!on) {
+    for (const p of ['left', 'top', 'width', 'height']) canvas.style[p] = '';
+    return;
+  }
+  const vv = window.visualViewport;
+  const vw = vv ? vv.width : innerWidth, vh = vv ? vv.height : innerHeight;
+  const ps = getComputedStyle(safeProbe), inset = (side) => parseFloat(ps['padding' + side]) || 0;
+  const rotated = root.classList.contains('rotated');   // the portrait screen turned: its top edge is the view's left
+  const W = rotated ? vh : vw, H = rotated ? vw : vh;
+  const left = rotated ? inset('Top') : inset('Left'), right = W - (rotated ? inset('Bottom') : inset('Right')) - BAR_WIDTH;
+  const width = Math.floor(Math.min(right - left, H * 5 / 3)), height = Math.floor(width * 3 / 5);
+  const x = Math.max(left, Math.min((W - width) / 2, right - width));
+  canvas.style.left = Math.round(x) + 'px';
+  canvas.style.top = Math.round((H - height) / 2) + 'px';
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+}
+
 function applyScreenMode() {
   const on = screenMode === 'on' || (screenMode === 'auto' && phoneLandscape.matches);
   root.classList.toggle('screen-only', on);
   root.classList.toggle('rotated', on && touchDevice.matches && innerHeight > innerWidth);
+  layoutScreen();
   if (!on && inFullscreen()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
   if (on && !screenOn && !link.ready) showToast(statusText.textContent + ' - tap the Bluetooth button to connect', statusText.dataset.kind);
   screenOn = on;
@@ -234,6 +262,7 @@ phoneLandscape.addEventListener('change', () => {
   applyScreenMode();
 });
 window.addEventListener('resize', applyScreenMode);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', applyScreenMode);
 document.getElementById('screen-button').addEventListener('click', () => { screenMode = 'on'; applyScreenMode(); });
 document.getElementById('mini-exit').addEventListener('click', () => {
   screenMode = phoneLandscape.matches ? 'off' : 'auto';

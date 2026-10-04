@@ -149,6 +149,12 @@
     padding: var(--it) var(--ir) var(--ib) var(--il);
     background: #000; border: 0; border-radius: 0; box-shadow: none;
   }
+  html.screen-only .device.sized { display: block; padding: 0; }   /* app.js places the screen (layoutScreen) */
+  html.screen-only .device.sized canvas { position: absolute; }
+  #safe-probe {
+    position: fixed; visibility: hidden; pointer-events: none;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
   html.screen-only .bezel { padding: 0; background: none; box-shadow: none; border-radius: 0; }
   html.screen-only canvas {
     --bar: 54px;   /* room for the control bar on the right (and the same on the left, so it stays centred) */
@@ -254,7 +260,8 @@
   </button>
 </div>
 <div id="toast" hidden></div>
+<div id="safe-probe"></div>
 <script src="nano-controller.js?v=bbe13faa07"></script>
-<script src="app.js?v=32430565db"></script>
+<script src="app.js?v=221d92029f"></script>
 </body>
 </html>
